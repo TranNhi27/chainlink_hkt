@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity 0.8.17;
 
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
@@ -13,9 +13,11 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     bytes32 private jobId;
     uint256 private fee;
 
-    /** @beneficiary: An 0xSplits contract that has 1 Gnosis contract as Controller of it
-    * In this 0xSplits contract will contain the list of charity organizations' addresses
-    */
+    /** 
+     * @notice
+     * @beneficiary: An 0xSplits contract that has 1 Gnosis contract as Controller of it
+     * In this 0xSplits contract will contain the list of charity organizations' addresses
+     */
     address public beneficiary;
 
     event RequestEarning(bytes32 indexed requestId, uint256 earning);
@@ -23,17 +25,18 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     /**
      * @notice Initialize the link token and target oracle
      *
-     * Sepolia Testnet details:
-     * Link Token: 0x779877A7B0D9E8603169DdbD7836e478b4624789
-     * Oracle: 0x6090149792dAAeE9D1D568c9f9a6F6B46AA29eFD (Chainlink DevRel)
-     * jobId: ca98366cc7314957b8c012c72f05aeeb
+     * Mumbai Testnet details:
+     * Link Token: 0x326C977E6efc84E512bB9C30f76E30c160eD06FB
+     * Oracle: 0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5 
+     * jobId: b1d42cd54a3a4200b1f725a68e488888
      *
      */
-    constructor(address _beneficiary) ConfirmedOwner(beneficiary) {
-        setChainlinkToken(0x779877A7B0D9E8603169DdbD7836e478b4624789);
-        setChainlinkOracle(0x6090149792dAAeE9D1D568c9f9a6F6B46AA29eFD);
-        jobId = "ca98366cc7314957b8c012c72f05aeeb";
+    constructor(address _owner, address _beneficiary) ConfirmedOwner(_owner) {
+        setChainlinkToken(0x326C977E6efc84E512bB9C30f76E30c160eD06FB);
+        setChainlinkOracle(0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5);
+        jobId = "b1d42cd54a3a4200b1f725a68e488888";
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
+        beneficiary = _beneficiary;
     }
 
      /**
@@ -59,7 +62,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         return sendChainlinkRequest(req, fee);
     }
 
-    /**
+    /** @notice
      * Receive the response in the form of uint256
      */
     function fulfill(
@@ -73,10 +76,11 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         earning = _earning;
     }
 
-    /**
+    /** @notice
      * Allow withdraw of Link tokens from the contract
-     @notice: LINK will always be sent to beneficiary 0xSplits contract
+     * LINK will always be sent to beneficiary 0xSplits contract
      */
+
     function withdrawLink() public onlyOwner {
         LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
         require(
@@ -84,5 +88,4 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
             "Unable to transfer"
         );
     }
-
 }
