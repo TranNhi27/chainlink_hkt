@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
+    LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
 
     using SafeMath for uint;
 
@@ -61,6 +62,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      * data, then multiply by 1000000000000000000 (to remove decimal places from data).
      */
     function requestWeekEarning() public returns (bytes32 requestId) {
+        require(link.balanceOf(beneficiary) == 0, "Previous earning needs distribution");
         Chainlink.Request memory req = buildChainlinkRequest(
             ggJobId,
             address(this),
@@ -138,7 +140,6 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      */
 
     function withdrawLink() public onlyOwner {
-        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
         require(
             link.transfer(beneficiary, link.balanceOf(address(this))),
             "Unable to transfer"
@@ -146,7 +147,6 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     }
 
     function _checkEligibleEarning() private {
-        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
         if (link.balanceOf(beneficiary) == linkAmount)
         {
             earningReports[block.number] = earning;
