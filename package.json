@@ -6,7 +6,8 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
-    "deployMumbai": "npx hardhat run --network mumbai scripts/deploy.ts"
+    "deployMumbai": "npx hardhat run --network mumbai scripts/deploy.ts",
+    "verify": "npx hardhat verify --network mumbai"
   },
   "author": "",
   "license": "ISC",
@@ -19,6 +20,7 @@
     "@chainlink/contracts": "^0.6.1",
     "@nomiclabs/hardhat-etherscan": "^3.1.7",
     "@nomiclabs/hardhat-waffle": "^2.0.6",
+    "@openzeppelin/contracts": "^4.9.0",
     "dotenv": "^16.1.3"
   }
 }

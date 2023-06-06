@@ -3,15 +3,28 @@ pragma solidity 0.8.17;
 
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Strings.sol"; 
 
 contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
 
+    using SafeMath for uint;
+
+
     // the earning amount of this week
     uint256 public earning;
 
-    bytes32 private jobId;
+    // the amount of LINK bought from Transak with $earning amount
+    uint256 public linkAmount;
+ 
+    // 2 separate jobId for google AdmodAPI and TransakAPI
+    bytes32 public ggJobId;
+    bytes32 public transakJobId;
+
     uint256 private fee;
+    mapping(uint256 => uint256) public earningReports;
+    bool public isEligible;
 
     /** 
      * @notice
@@ -21,6 +34,8 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     address public beneficiary;
 
     event RequestEarning(bytes32 indexed requestId, uint256 earning);
+    event RequestBoughtAmount(bytes32 indexed requestId, uint256 linkAmount);
+
 
     /**
      * @notice Initialize the link token and target oracle
@@ -28,15 +43,17 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      * Mumbai Testnet details:
      * Link Token: 0x326C977E6efc84E512bB9C30f76E30c160eD06FB
      * Oracle: 0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5 
-     * jobId: b1d42cd54a3a4200b1f725a68e488888
-     *
+     * ggJobId: b1d42cd54a3a4200b1f725a68e488888
+     * transakJobId: b1d42cd54a3a4200b1f725a68e488999
      */
     constructor(address _owner, address _beneficiary) ConfirmedOwner(_owner) {
         setChainlinkToken(0x326C977E6efc84E512bB9C30f76E30c160eD06FB);
         setChainlinkOracle(0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5);
-        jobId = "b1d42cd54a3a4200b1f725a68e488888";
+        ggJobId = "b1d42cd54a3a4200b1f725a68e488888";
+        transakJobId = "b1d42cd54a3a4200b1f725a68e488999";
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
         beneficiary = _beneficiary;
+        isEligible = false;
     }
 
      /**
@@ -45,7 +62,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      */
     function requestWeekEarning() public returns (bytes32 requestId) {
         Chainlink.Request memory req = buildChainlinkRequest(
-            jobId,
+            ggJobId,
             address(this),
             this.fulfill.selector
         );
@@ -74,6 +91,45 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         @notice earning will be a total of earning this week subtract for Transak transaction fee
         */
         earning = _earning;
+        _requestTransakValidation();
+    }
+
+    function _requestTransakValidation() private returns (bytes32 requestId) {
+        Chainlink.Request memory req = buildChainlinkRequest(
+            transakJobId,
+            address(this),
+            this.fulfillTransakPrice.selector
+        );
+
+        uint256 headEarning = SafeMath.div(earning,1000000);
+        uint256 tailEarning = SafeMath.mod(earning,1000000);
+
+        string memory apiUrl = string(abi.encodePacked("https://api-stg.transak.com/api/v2/currencies/price?partnerApiKey=062525f0-856b-4302-9d48-8b690bb5e634&fiatCurrency=USD&cryptoCurrency=ETH&isBuyOrSell=BUY&network=ethereum&paymentMethod=credit_debit_card&fiatAmount=",
+         Strings.toString(headEarning),".",Strings.toString(tailEarning)));
+
+        // Set the URL to perform the GET request on
+        req.add(
+            "get",
+            apiUrl
+        );
+
+        req.add("path", "response,cryptoAmount");
+        req.addUint("times", LINK_DIVISIBILITY);
+
+        // Sends the request
+        return sendChainlinkRequest(req, fee);
+    }
+
+    function fulfillTransakPrice(
+        bytes32 _requestId,
+        uint256 _linkAmount
+    ) public recordChainlinkFulfillment(_requestId) {
+        emit RequestBoughtAmount(_requestId, _linkAmount);
+        /** 
+        @notice earning will be a total of earning this week subtract for Transak transaction fee
+        */
+        linkAmount = _linkAmount;
+        _checkEligibleEarning();
     }
 
     /** @notice
@@ -88,4 +144,15 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
             "Unable to transfer"
         );
     }
+
+    function _checkEligibleEarning() private {
+        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
+        if (link.balanceOf(beneficiary) == linkAmount)
+        {
+            earningReports[block.number] = earning;
+            isEligible = true;
+        }
+        else isEligible = false;
+    }
+
 }
