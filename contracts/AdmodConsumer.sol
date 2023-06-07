@@ -62,7 +62,6 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      * data, then multiply by 1000000000000000000 (to remove decimal places from data).
      */
     function requestWeekEarning() public returns (bytes32 requestId) {
-        require(link.balanceOf(beneficiary) == 0, "Previous earning needs distribution");
         Chainlink.Request memory req = buildChainlinkRequest(
             ggJobId,
             address(this),
