@@ -12,6 +12,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     using SafeMath for uint;
 
+    address public upkeepRegistry;
 
     // the earning amount of this week
     uint256 public earning;
@@ -26,6 +27,12 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     uint256 private fee;
     mapping(uint256 => uint256) public earningReports;
     bool public isEligible;
+
+    // only Upkeep Registry is allowed 
+    modifier onlyUpkeep {
+        require(msg.sender == upkeep, "not Upkeep Registry");
+        _;
+    }
 
     /** 
      * @notice
@@ -46,6 +53,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      * Oracle: 0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5 
      * ggJobId: b1d42cd54a3a4200b1f725a68e488888
      * transakJobId: b1d42cd54a3a4200b1f725a68e488999
+     * Mumbai Registry: 0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2
      */
     constructor(address _owner, address _beneficiary) ConfirmedOwner(_owner) {
         setChainlinkToken(0x326C977E6efc84E512bB9C30f76E30c160eD06FB);
@@ -55,13 +63,14 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
         beneficiary = _beneficiary;
         isEligible = false;
+        upkeepRegistry = address("0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2");
     }
 
      /**
      * Create a Chainlink request to retrieve API response, find the target
      * data, then multiply by 1000000000000000000 (to remove decimal places from data).
      */
-    function requestWeekEarning() public returns (bytes32 requestId) {
+    function requestWeekEarning() public onlyUpkeep returns (bytes32 requestId) {
         Chainlink.Request memory req = buildChainlinkRequest(
             ggJobId,
             address(this),
