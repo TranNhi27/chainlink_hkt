@@ -30,7 +30,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     // only Upkeep Registry is allowed 
     modifier onlyUpkeep {
-        require(msg.sender == upkeep, "not Upkeep Registry");
+        require(msg.sender == upkeepRegistry, "not Upkeep Registry");
         _;
     }
 
@@ -70,7 +70,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
         beneficiary = _beneficiary;
         isEligible = false;
-        upkeepRegistry = address("0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2");
+        upkeepRegistry = address(0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2);
         nonce = 0;
     }
 
@@ -163,7 +163,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     }
 
     function _checkEligibleEarning() private {
-        uint256 beneficiaryBalance = SafeMath.add(link.balanceOf(beneficiary, nonce));
+        uint256 beneficiaryBalance = SafeMath.add(link.balanceOf(beneficiary), nonce);
         if (beneficiaryBalance == linkAmount)
         {
             earningReports[block.number] = earning;
