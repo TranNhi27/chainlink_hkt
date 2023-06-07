@@ -41,6 +41,13 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      */
     address public beneficiary;
 
+    /** 
+     * @notice
+     * @nonce: this is required for 0xSplits contract because after each distribution
+     * the contract will leave 1 Link wei to prevent overflow
+     */
+    uint256 public nonce;
+
     event RequestEarning(bytes32 indexed requestId, uint256 earning);
     event RequestBoughtAmount(bytes32 indexed requestId, uint256 linkAmount);
 
@@ -64,6 +71,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         beneficiary = _beneficiary;
         isEligible = false;
         upkeepRegistry = address("0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2");
+        nonce = 0;
     }
 
      /**
@@ -155,10 +163,12 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     }
 
     function _checkEligibleEarning() private {
-        if (link.balanceOf(beneficiary) == linkAmount)
+        uint256 beneficiaryBalance = SafeMath.add(link.balanceOf(beneficiary, nonce));
+        if (beneficiaryBalance == linkAmount)
         {
             earningReports[block.number] = earning;
             isEligible = true;
+            nonce++;
         }
         else isEligible = false;
     }
