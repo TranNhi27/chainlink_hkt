@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
-    LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
 
     using SafeMath for uint;
 
@@ -71,7 +70,6 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         beneficiary = _beneficiary;
         isEligible = false;
         upkeepRegistry = address(0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2);
-        nonce = 0;
     }
 
      /**
@@ -88,10 +86,12 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         // Set the URL to perform the GET request on
         req.add(
             "get",
-            "https://testapi.io/api/Hayden/v1/accounts/pub-9988776655443322/networkReport"
+            "https://testapi.io/api/Hayden27/v1/accounts/pub-9988776655443322/networkReport"
         );
 
         req.add("path", "row,metricValues,ESTIMATED_EARNINGS,microsValue");
+        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
+        nonce = link.balanceOf(beneficiary);
 
         // Sends the request
         return sendChainlinkRequest(req, fee);
@@ -122,8 +122,8 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         uint256 headEarning = SafeMath.div(earning,1000000);
         uint256 tailEarning = SafeMath.mod(earning,1000000);
 
-        string memory apiUrl = string(abi.encodePacked("https://api-stg.transak.com/api/v2/currencies/price?partnerApiKey=062525f0-856b-4302-9d48-8b690bb5e634&fiatCurrency=USD&cryptoCurrency=ETH&isBuyOrSell=BUY&network=ethereum&paymentMethod=credit_debit_card&fiatAmount=",
-         Strings.toString(headEarning),".",Strings.toString(tailEarning)));
+        string memory apiUrl = string(abi.encodePacked("https://api.transak.com/api/v2/currencies/price?partnerApiKey=80250c2b-316a-4168-8328-56299dabfe00&fiatCurrency=USD&cryptoCurrency=LINK&isBuyOrSell=BUY&network=ethereum&paymentMethod=credit_debit_card&fiatAmount=",
+        Strings.toString(headEarning),".",Strings.toString(tailEarning)));
 
         // Set the URL to perform the GET request on
         req.add(
@@ -156,6 +156,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      */
 
     function withdrawLink() public onlyOwner {
+        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
         require(
             link.transfer(beneficiary, link.balanceOf(address(this))),
             "Unable to transfer"
@@ -163,6 +164,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     }
 
     function _checkEligibleEarning() private {
+        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
         uint256 beneficiaryBalance = SafeMath.add(link.balanceOf(beneficiary), nonce);
         if (beneficiaryBalance == linkAmount)
         {

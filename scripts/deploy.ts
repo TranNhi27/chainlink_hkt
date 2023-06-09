@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 
 async function main() {
   const owner = "0x6788b5bf9755b3b100af0f23df4781beff51779a";
-  const beneficiary = "0x6788b5bf9755b3b100af0f23df4781beff51779a";
+  const beneficiary = "0x1f36664a18F1B50963CabbA8F9e7D03AD57532dD";
 
   const AdmodConsumer = await ethers.getContractFactory("AdmodConsumer");
   const admodConsumer = await AdmodConsumer.deploy(owner, beneficiary);
