@@ -11,7 +11,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     using SafeMath for uint;
 
-    address public upkeepRegistry;
+    address public upkeep;
 
     // the earning amount of this week
     uint256 public earning;
@@ -24,12 +24,21 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     bytes32 public transakJobId;
 
     uint256 private fee;
+
+    // save this week earningReport if the status of the contract is active
     mapping(uint256 => uint256) public earningReports;
+
+    /** 
+     * @notice
+     * @isEligible: The important variable to judge the reliability of the contract
+     * if isEligible=true => the current status of the contract is transparent
+     * else isEligible=fallse => malicious actions have been made to the contract; or the mobile Application
+     */
     bool public isEligible;
 
     // only Upkeep Registry is allowed 
     modifier onlyUpkeep {
-        require(msg.sender == upkeepRegistry, "not Upkeep Registry");
+        require(msg.sender == upkeep, "Sender is not Upkeep");
         _;
     }
 
@@ -69,12 +78,12 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
         beneficiary = _beneficiary;
         isEligible = false;
-        upkeepRegistry = address(0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2);
+        upkeep = address(0x3931703419Fc456Cd48157497166550493C92448);
     }
 
      /**
-     * Create a Chainlink request to retrieve API response, find the target
-     * data, then multiply by 1000000000000000000 (to remove decimal places from data).
+     * Create a Chainlink request to retrieve Google Admod API response,
+     * find the earning this week,
      */
     function requestWeekEarning() public onlyUpkeep returns (bytes32 requestId) {
         Chainlink.Request memory req = buildChainlinkRequest(
@@ -90,8 +99,6 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         );
 
         req.add("path", "row,metricValues,ESTIMATED_EARNINGS,microsValue");
-        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
-        nonce = link.balanceOf(beneficiary);
 
         // Sends the request
         return sendChainlinkRequest(req, fee);
@@ -109,6 +116,8 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         @notice earning will be a total of earning this week subtract for Transak transaction fee
         */
         earning = _earning;
+        LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
+        nonce = link.balanceOf(beneficiary);
         _requestTransakValidation();
     }
 
