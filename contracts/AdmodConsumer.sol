@@ -77,7 +77,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         transakJobId = "b1d42cd54a3a4200b1f725a68e488999";
         fee = (1 * LINK_DIVISIBILITY) / 10; // 0,1 * 10**18 (Varies by network and job)
         beneficiary = _beneficiary;
-        isEligible = false;
+        isEligible = true;
         upkeep = address(0x3931703419Fc456Cd48157497166550493C92448);
     }
 
