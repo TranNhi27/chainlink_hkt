@@ -11,6 +11,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     using SafeMath for uint;
 
+    // Chainlink Automation's Upkeep contract
     address public upkeep;
 
     // the earning amount of this week
@@ -25,18 +26,21 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     uint256 private fee;
 
-    // save this week earningReport if the status of the contract is active
+    /** 
+     * Save this week earningReport if the status of the contract is still active
+     * => isEligible == true
+     */
     mapping(uint256 => uint256) public earningReports;
 
     /** 
      * @notice
      * @isEligible: The important variable to judge the reliability of the contract
-     * if isEligible=true => the current status of the contract is transparent
-     * else isEligible=fallse => malicious actions have been made to the contract; or the mobile Application
+     * if isEligible == true => the current status of the contract is transparent
+     * else isEligible == false => malicious actions have been made to the contract; or the mobile Application
      */
     bool public isEligible;
 
-    // only Upkeep Registry is allowed 
+    // only Chainlink's Upkeep is allowed 
     modifier onlyUpkeep {
         require(msg.sender == upkeep, "Sender is not Upkeep");
         _;
@@ -68,7 +72,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
      * Oracle: 0xaA37473c8d78F0f1C86c9d8aEE53E8B896bCB4D5 
      * ggJobId: b1d42cd54a3a4200b1f725a68e488888
      * transakJobId: b1d42cd54a3a4200b1f725a68e488999
-     * Mumbai Registry: 0xE16Df59B887e3Caa439E0b29B42bA2e7976FD8b2
+     * Upkeep: 0x3931703419Fc456Cd48157497166550493C92448
      */
     constructor(address _owner, address _beneficiary) ConfirmedOwner(_owner) {
         setChainlinkToken(0x326C977E6efc84E512bB9C30f76E30c160eD06FB);
@@ -83,7 +87,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
      /**
      * Create a Chainlink request to retrieve Google Admod API response,
-     * find the earning this week,
+     * fetch the earning this week,
      */
     function requestWeekEarning() public onlyUpkeep returns (bytes32 requestId) {
         Chainlink.Request memory req = buildChainlinkRequest(
@@ -92,7 +96,7 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
             this.fulfill.selector
         );
 
-        // Set the URL to perform the GET request on
+        // testapi following Google Admod API structure
         req.add(
             "get",
             "https://testapi.io/api/Hayden27/v1/accounts/pub-9988776655443322/networkReport"
@@ -105,22 +109,23 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
     }
 
     /** @notice
-     * Receive the response in the form of uint256
+     * Receive the response's earning in the form of uint256
      */
     function fulfill(
         bytes32 _requestId,
         uint256 _earning
     ) public recordChainlinkFulfillment(_requestId) {
         emit RequestEarning(_requestId, _earning);
-        /** 
-        @notice earning will be a total of earning this week subtract for Transak transaction fee
-        */
+
         earning = _earning;
         LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
+        // The contract will update 0xSplit beneficiary contract balance here 
+        // it would be in form of LINK wei
         nonce = link.balanceOf(beneficiary);
         _requestTransakValidation();
     }
 
+    // Send a request to Transak API to fetch LINK amount = Earning this week
     function _requestTransakValidation() private returns (bytes32 requestId) {
         Chainlink.Request memory req = buildChainlinkRequest(
             transakJobId,
@@ -128,6 +133,8 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
             this.fulfillTransakPrice.selector
         );
 
+        // Get the real Earning since Earning from Google is in microsValue
+        // E.g: 165320000 = 165.32$
         uint256 headEarning = SafeMath.div(earning,1000000);
         uint256 tailEarning = SafeMath.mod(earning,1000000);
 
@@ -147,15 +154,15 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
         return sendChainlinkRequest(req, fee);
     }
 
+    // Oracle fulfill the Transak Request
     function fulfillTransakPrice(
         bytes32 _requestId,
         uint256 _linkAmount
     ) public recordChainlinkFulfillment(_requestId) {
         emit RequestBoughtAmount(_requestId, _linkAmount);
-        /** 
-        @notice earning will be a total of earning this week subtract for Transak transaction fee
-        */
+        // Update LINK amount buyable 
         linkAmount = _linkAmount;
+        // Check if the LINK amount equals 0xSplit beneficiary contract balance
         _checkEligibleEarning();
     }
 
@@ -174,12 +181,17 @@ contract AdmodConsumer is ChainlinkClient, ConfirmedOwner {
 
     function _checkEligibleEarning() private {
         LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
-        uint256 beneficiaryBalance = SafeMath.add(link.balanceOf(beneficiary), nonce);
-        if (beneficiaryBalance == linkAmount)
+        /** @notice
+        * beneficiaryBalance = linkAmount + nonce
+        * because after every distribution to Split's recipents 0xSplit contract 
+        * will leave 1 LINK Wei to prevent overflow
+         */
+        uint256 beneficiaryBalance = SafeMath.add(linkAmount, nonce);
+        if (beneficiaryBalance == link.balanceOf(beneficiary))
         {
+            // If balance of beneficiary = beneficiaryBalance => isEligible = true
             earningReports[block.number] = earning;
             isEligible = true;
-            nonce++;
         }
         else isEligible = false;
     }
